@@ -1,0 +1,46 @@
+{
+  "dashboard": {
+    "title": "Food Delivery System Overview",
+    "tags": ["food-delivery", "microservices"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Service Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=~\".*-service\"}"
+          }
+        ]
+      },
+      {
+        "title": "Request Rate (req/s)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_server_requests_seconds_count[5m])"
+          }
+        ]
+      },
+      {
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])"
+          }
+        ]
+      },
+      {
+        "title": "Response Time (P95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m]))"
+          }
+        ]
+      }
+    ]
+  }
+}
+
