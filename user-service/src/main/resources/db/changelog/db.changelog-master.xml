@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="1" author="dberezina">
+        <comment>Create users table</comment>
+        <createTable tableName="users">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="email" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="password_hash" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="phone" type="VARCHAR(20)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="first_name" type="VARCHAR(100)"/>
+            <column name="last_name" type="VARCHAR(100)"/>
+            <column name="role" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(20)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="DATETIME2" defaultValueComputed="GETDATE()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="DATETIME2" defaultValueComputed="GETDATE()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="DATETIME2"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="dberezina">
+        <comment>Create user_addresses table</comment>
+        <createTable tableName="user_addresses">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="address_line" type="VARCHAR(500)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="city" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="postal_code" type="VARCHAR(20)"/>
+            <column name="country" type="VARCHAR(100)"/>
+            <column name="latitude" type="DECIMAL(10,8)"/>
+            <column name="longitude" type="DECIMAL(11,8)"/>
+            <column name="is_default" type="BIT" defaultValueBoolean="false"/>
+            <column name="label" type="VARCHAR(50)"/>
+            <column name="created_at" type="DATETIME2" defaultValueComputed="GETDATE()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="DATETIME2" defaultValueComputed="GETDATE()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="user_addresses"
+                baseColumnNames="user_id"
+                constraintName="fk_user_addresses_user"
+                referencedTableName="users"
+                referencedColumnNames="id"/>
+    </changeSet>
+
+    <changeSet id="3" author="dberezina">
+        <comment>Create indexes</comment>
+        
+        <!-- NOTE: email and phone indexes REMOVED - UNIQUE constraint already creates them -->
+        
+        <createIndex indexName="idx_users_role" tableName="users">
+            <column name="role"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_users_deleted_at" tableName="users">
+            <column name="deleted_at"/>
+        </createIndex>
+
+        <createIndex indexName="idx_user_addresses_user_id" tableName="user_addresses">
+            <column name="user_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ========================================
+         INDEX OPTIMIZATIONS
+         ======================================== -->
+
+    <changeSet id="4" author="dberezina">
+        <comment>Add composite indexes for query optimization</comment>
+        
+        <!-- Query: WHERE deletedAt IS NULL AND role = ? -->
+        <!-- deleted_at has HIGH selectivity (95% NULL) -->
+        <createIndex indexName="idx_users_active_role" tableName="users">
+            <column name="deleted_at"/>
+            <column name="role"/>
+        </createIndex>
+        
+        <!-- Query: WHERE user_id = ? AND is_default = true -->
+        <!-- is_default has HIGH selectivity in context (only 1 default per user) -->
+        <createIndex indexName="idx_user_addresses_user_default" tableName="user_addresses">
+            <column name="user_id"/>
+            <column name="is_default"/>
+        </createIndex>
+        
+        <rollback>
+            <dropIndex tableName="users" indexName="idx_users_active_role"/>
+            <dropIndex tableName="user_addresses" indexName="idx_user_addresses_user_default"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

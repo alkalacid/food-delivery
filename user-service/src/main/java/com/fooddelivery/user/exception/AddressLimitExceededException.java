@@ -1,0 +1,8 @@
+package com.fooddelivery.user.exception;
+
+public class AddressLimitExceededException extends RuntimeException {
+    public AddressLimitExceededException(String message) {
+        super(message);
+    }
+}
+

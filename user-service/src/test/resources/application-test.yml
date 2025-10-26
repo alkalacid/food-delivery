@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:tc:sqlserver:2022-latest:///testdb
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+  
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  
+  liquibase:
+    enabled: false
+
+jwt:
+  secret: testSecretKeyForJWTTokenGenerationAndValidationMustBeAtLeast256BitsLongForTesting
+  expiration: 86400000
+  refresh-expiration: 604800000
+
+eureka:
+  client:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
