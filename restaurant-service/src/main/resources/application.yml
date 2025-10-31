@@ -1,0 +1,13 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: restaurant-service
+  config:
+    import: optional:configserver:http://localhost:8888
+  profiles:
+    include: common,datasource
+  datasource:
+    url: jdbc:sqlserver://${DB_HOST:localhost}:${DB_PORT:1433};databaseName=food_delivery_restaurant_db;encrypt=false;trustServerCertificate=true
+
