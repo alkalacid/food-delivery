@@ -24,6 +24,8 @@ subprojects {
     }
 
     dependencies {
+        implementation(platform("org.springframework.cloud:spring-cloud-dependencies:${rootProject.extra["springCloudVersion"]}"))
+
         // Lombok
         compileOnly("org.projectlombok:lombok")
         annotationProcessor("org.projectlombok:lombok")
@@ -120,16 +122,7 @@ configure(subprojects.filter { it.name in databaseServices }) {
     }
 }
 
-// Spring Cloud version management
 extra["springCloudVersion"] = "2023.0.0"
-
-subprojects {
-    dependencyManagement {
-        imports {
-            mavenBom("org.springframework.cloud:spring-cloud-dependencies:${rootProject.extra["springCloudVersion"]}")
-        }
-    }
-}
 
 tasks.register("cleanAll") {
     description = "Clean all subprojects"

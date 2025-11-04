@@ -1,5 +1,12 @@
 rootProject.name = "food-delivery-system"
 
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
 // Infrastructure services
 include("config-server")
 include("discovery-server")
