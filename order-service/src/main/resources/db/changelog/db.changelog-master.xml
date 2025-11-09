@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="1" author="dberezina">
+        <comment>Create orders table</comment>
+        <createTable tableName="orders">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="restaurant_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="delivery_address_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="total_amount" type="DECIMAL(10,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="subtotal" type="DECIMAL(10,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="delivery_fee" type="DECIMAL(10,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="discount" type="DECIMAL(10,2)" defaultValueNumeric="0.00"/>
+            <column name="promo_code" type="VARCHAR(50)"/>
+            <column name="special_instructions" type="VARCHAR(500)"/>
+            <column name="estimated_delivery_time" type="INT"/>
+            <column name="delivered_at" type="DATETIME2"/>
+            <column name="created_at" type="DATETIME2" defaultValueComputed="GETDATE()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="DATETIME2" defaultValueComputed="GETDATE()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="dberezina">
+        <comment>Create order_items table</comment>
+        <createTable tableName="order_items">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="order_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="menu_item_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="menu_item_name" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="quantity" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="price" type="DECIMAL(10,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="subtotal" type="DECIMAL(10,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="special_instructions" type="VARCHAR(200)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="3" author="dberezina">
+        <comment>Create partitioned order_history table</comment>
+        
+        <!-- Step 1: Create Partition Function for order_history -->
+        <sql>
+            CREATE PARTITION FUNCTION PF_OrderHistoryByMonth (DATETIME2)
+            AS RANGE RIGHT FOR VALUES 
+            (
+                '2024-01-01', '2024-02-01', '2024-03-01', '2024-04-01', 
+                '2024-05-01', '2024-06-01', '2024-07-01', '2024-08-01', 
+                '2024-09-01', '2024-10-01', '2024-11-01', '2024-12-01',
+                '2025-01-01', '2025-02-01', '2025-03-01', '2025-04-01', 
+                '2025-05-01', '2025-06-01', '2025-07-01', '2025-08-01', 
+                '2025-09-01', '2025-10-01', '2025-11-01', '2025-12-01',
+                '2026-01-01'
+            );
+        </sql>
+        
+        <!-- Step 2: Create Partition Scheme -->
+        <sql>
+            CREATE PARTITION SCHEME PS_OrderHistoryByMonth
+            AS PARTITION PF_OrderHistoryByMonth ALL TO ([PRIMARY]);
+        </sql>
+        
+        <!-- Step 3: Create partitioned table -->
+        <sql>
+            CREATE TABLE order_history (
+                id BIGINT IDENTITY(1,1) NOT NULL,
+                order_id BIGINT NOT NULL,
+                status VARCHAR(20) NOT NULL,
+                changed_by BIGINT NOT NULL,
+                comment VARCHAR(500),
+                changed_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+                
+                -- PRIMARY KEY must include partitioning column
+                CONSTRAINT pk_order_history PRIMARY KEY NONCLUSTERED (id, changed_at)
+            ) ON PS_OrderHistoryByMonth(changed_at);
+            
+            -- Clustered index on partitioning column for performance
+            CREATE CLUSTERED INDEX idx_order_history_clustered ON order_history(changed_at);
+        </sql>
+    </changeSet>
+
+    <changeSet id="4" author="dberezina">
+        <comment>Add foreign keys</comment>
+        <addForeignKeyConstraint
+                baseTableName="order_items"
+                baseColumnNames="order_id"
+                constraintName="fk_order_items_order"
+                referencedTableName="orders"
+                referencedColumnNames="id"
+                onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+                baseTableName="order_history"
+                baseColumnNames="order_id"
+                constraintName="fk_order_history_order"
+                referencedTableName="orders"
+                referencedColumnNames="id"
+                onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="5" author="dberezina">
+        <comment>Create indexes</comment>
+        <createIndex indexName="idx_orders_user_id" tableName="orders">
+            <column name="user_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_orders_restaurant_id" tableName="orders">
+            <column name="restaurant_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_orders_status" tableName="orders">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex indexName="idx_orders_created_at" tableName="orders">
+            <column name="created_at"/>
+        </createIndex>
+
+        <createIndex indexName="idx_order_items_order_id" tableName="order_items">
+            <column name="order_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_order_items_menu_item_id" tableName="order_items">
+            <column name="menu_item_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_order_history_order_id" tableName="order_history">
+            <column name="order_id"/>
+        </createIndex>
+        
+        <!-- NOTE: idx_order_history_changed_at removed - clustered index already exists from changeSet id="3" -->
+    </changeSet>
+
+    <!-- ========================================
+         INDEX OPTIMIZATIONS
+         ======================================== -->
+
+    <changeSet id="6" author="dberezina">
+        <comment>Add composite indexes for query optimization</comment>
+        
+        <!-- Query: WHERE user_id = ? ORDER BY created_at DESC -->
+        <!-- This is one of the MOST frequent queries in the system -->
+        <createIndex indexName="idx_orders_user_created" tableName="orders">
+            <column name="user_id"/>
+            <column name="created_at" descending="true"/>
+        </createIndex>
+        
+        <!-- Query: WHERE user_id = ? AND status = ? -->
+        <!-- Used for filtering active/completed orders -->
+        <createIndex indexName="idx_orders_user_status" tableName="orders">
+            <column name="user_id"/>
+            <column name="status"/>
+        </createIndex>
+        
+        <!-- Query: WHERE restaurant_id = ? AND status = ? -->
+        <!-- Restaurant dashboard filtering -->
+        <createIndex indexName="idx_orders_restaurant_status" tableName="orders">
+            <column name="restaurant_id"/>
+            <column name="status"/>
+        </createIndex>
+        
+        <rollback>
+            <dropIndex tableName="orders" indexName="idx_orders_user_created"/>
+            <dropIndex tableName="orders" indexName="idx_orders_user_status"/>
+            <dropIndex tableName="orders" indexName="idx_orders_restaurant_status"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ========================================
+         DATA INTEGRITY: CHECK CONSTRAINTS
+         ======================================== -->
+
+    <changeSet id="7" author="dberezina">
+        <comment>Add CHECK constraints for data integrity</comment>
+        
+        <!-- Order amounts must be non-negative -->
+        <sql>
+            ALTER TABLE orders ADD CONSTRAINT chk_orders_total_amount 
+                CHECK (total_amount >= 0);
+        </sql>
+        
+        <sql>
+            ALTER TABLE orders ADD CONSTRAINT chk_orders_subtotal 
+                CHECK (subtotal >= 0);
+        </sql>
+        
+        <sql>
+            ALTER TABLE orders ADD CONSTRAINT chk_orders_delivery_fee 
+                CHECK (delivery_fee >= 0);
+        </sql>
+        
+        <sql>
+            ALTER TABLE orders ADD CONSTRAINT chk_orders_discount 
+                CHECK (discount >= 0);
+        </sql>
+        
+        <!-- Order item quantities and prices must be positive -->
+        <sql>
+            ALTER TABLE order_items ADD CONSTRAINT chk_order_items_quantity 
+                CHECK (quantity > 0);
+        </sql>
+        
+        <sql>
+            ALTER TABLE order_items ADD CONSTRAINT chk_order_items_price 
+                CHECK (price > 0);
+        </sql>
+        
+        <sql>
+            ALTER TABLE order_items ADD CONSTRAINT chk_order_items_subtotal 
+                CHECK (subtotal >= 0);
+        </sql>
+        
+        <rollback>
+            <sql>ALTER TABLE orders DROP CONSTRAINT chk_orders_total_amount;</sql>
+            <sql>ALTER TABLE orders DROP CONSTRAINT chk_orders_subtotal;</sql>
+            <sql>ALTER TABLE orders DROP CONSTRAINT chk_orders_delivery_fee;</sql>
+            <sql>ALTER TABLE orders DROP CONSTRAINT chk_orders_discount;</sql>
+            <sql>ALTER TABLE order_items DROP CONSTRAINT chk_order_items_quantity;</sql>
+            <sql>ALTER TABLE order_items DROP CONSTRAINT chk_order_items_price;</sql>
+            <sql>ALTER TABLE order_items DROP CONSTRAINT chk_order_items_subtotal;</sql>
+        </rollback>
+    </changeSet>
+
+    <include file="db/changelog/changes/008-create-promo-codes-table.xml" relativeToChangelogFile="false"/>
+
+</databaseChangeLog>

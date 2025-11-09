@@ -1,0 +1,33 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: order-service
+  config:
+    import: optional:configserver:http://localhost:8888
+  profiles:
+    include: common,datasource
+  datasource:
+    url: jdbc:sqlserver://${DB_HOST:localhost}:${DB_PORT:1433};databaseName=food_delivery_order_db;encrypt=false;trustServerCertificate=true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9099}
+    consumer:
+      group-id: order-service-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+app:
+  services:
+    restaurant:
+      base-url: ${RESTAURANT_SERVICE_URL:http://restaurant-service}
+      restaurants-endpoint: /api/restaurants
+      menu-items-batch-endpoint: /api/menu-items/batch
+    user:
+      base-url: ${USER_SERVICE_URL:http://user-service}
+      addresses-endpoint: /api/addresses
+  pricing:
+    base-delivery-fee: ${BASE_DELIVERY_FEE:2.50}
+    delivery-fee-per-km: ${DELIVERY_FEE_PER_KM:0.50}
+    base-preparation-time: ${BASE_PREPARATION_TIME:20}
+    delivery-time-per-km: ${DELIVERY_TIME_PER_KM:3}

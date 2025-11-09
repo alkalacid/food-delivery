@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="008-1" author="dberezina">
+        <comment>Create promo_codes table</comment>
+        <createTable tableName="promo_codes">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="code" type="VARCHAR(50)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="description" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="discount_type" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="discount_value" type="DECIMAL(10,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="min_order_amount" type="DECIMAL(10,2)"/>
+            <column name="max_discount_amount" type="DECIMAL(10,2)"/>
+            <column name="valid_from" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+            <column name="valid_until" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+            <column name="max_total_uses" type="INT"/>
+            <column name="current_uses" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="max_uses_per_user" type="INT"/>
+            <column name="active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deleted_at" type="DATETIME"/>
+        </createTable>
+
+        <addCheckConstraint
+                tableName="promo_codes"
+                constraintName="chk_promo_discount_value_positive"
+                checkConstraint="discount_value > 0"/>
+
+        <addCheckConstraint
+                tableName="promo_codes"
+                constraintName="chk_promo_valid_dates"
+                checkConstraint="valid_from &lt; valid_until"/>
+    </changeSet>
+
+    <changeSet id="008-2" author="dberezina">
+        <comment>Create promo_code_usage table</comment>
+        <createTable tableName="promo_code_usage">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="promo_code_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="order_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="used_at" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="promo_code_usage"
+                baseColumnNames="promo_code_id"
+                referencedTableName="promo_codes"
+                referencedColumnNames="id"
+                constraintName="fk_promo_usage_promo_code"
+                onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+                baseTableName="promo_code_usage"
+                baseColumnNames="order_id"
+                referencedTableName="orders"
+                referencedColumnNames="id"
+                constraintName="fk_promo_usage_order"
+                onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="008-3" author="dberezina">
+        <comment>Create indexes for promo codes</comment>
+        
+        <createIndex tableName="promo_codes" indexName="idx_promo_code" unique="true">
+            <column name="code"/>
+        </createIndex>
+
+        <createIndex tableName="promo_codes" indexName="idx_promo_active">
+            <column name="active"/>
+        </createIndex>
+
+        <createIndex tableName="promo_codes" indexName="idx_promo_valid_dates">
+            <column name="valid_from"/>
+            <column name="valid_until"/>
+        </createIndex>
+
+        <createIndex tableName="promo_code_usage" indexName="idx_usage_user_promo">
+            <column name="user_id"/>
+            <column name="promo_code_id"/>
+        </createIndex>
+
+        <createIndex tableName="promo_code_usage" indexName="idx_usage_order">
+            <column name="order_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="008-4" author="dberezina">
+        <comment>Insert sample promo codes for testing</comment>
+        <insert tableName="promo_codes">
+            <column name="code" value="WELCOME10"/>
+            <column name="description" value="10% off for new users"/>
+            <column name="discount_type" value="PERCENTAGE"/>
+            <column name="discount_value" value="10"/>
+            <column name="min_order_amount" value="20"/>
+            <column name="max_discount_amount" value="10"/>
+            <column name="valid_from" valueDate="2025-01-01T00:00:00"/>
+            <column name="valid_until" valueDate="2026-12-31T23:59:59"/>
+            <column name="max_total_uses" value="1000"/>
+            <column name="current_uses" value="0"/>
+            <column name="max_uses_per_user" value="1"/>
+            <column name="active" valueBoolean="true"/>
+            <column name="created_at" valueDate="2025-10-20T00:00:00"/>
+            <column name="updated_at" valueDate="2025-10-20T00:00:00"/>
+        </insert>
+
+        <insert tableName="promo_codes">
+            <column name="code" value="FREESHIP"/>
+            <column name="description" value="Free delivery for orders above $30"/>
+            <column name="discount_type" value="FREE_DELIVERY"/>
+            <column name="discount_value" value="5"/>
+            <column name="min_order_amount" value="30"/>
+            <column name="valid_from" valueDate="2025-01-01T00:00:00"/>
+            <column name="valid_until" valueDate="2026-12-31T23:59:59"/>
+            <column name="active" valueBoolean="true"/>
+            <column name="created_at" valueDate="2025-10-20T00:00:00"/>
+            <column name="updated_at" valueDate="2025-10-20T00:00:00"/>
+        </insert>
+
+        <insert tableName="promo_codes">
+            <column name="code" value="SAVE5"/>
+            <column name="description" value="$5 off on any order"/>
+            <column name="discount_type" value="FIXED_AMOUNT"/>
+            <column name="discount_value" value="5"/>
+            <column name="min_order_amount" value="15"/>
+            <column name="valid_from" valueDate="2025-01-01T00:00:00"/>
+            <column name="valid_until" valueDate="2026-12-31T23:59:59"/>
+            <column name="max_total_uses" value="500"/>
+            <column name="current_uses" value="0"/>
+            <column name="max_uses_per_user" value="3"/>
+            <column name="active" valueBoolean="true"/>
+            <column name="created_at" valueDate="2025-10-20T00:00:00"/>
+            <column name="updated_at" valueDate="2025-10-20T00:00:00"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>
+
