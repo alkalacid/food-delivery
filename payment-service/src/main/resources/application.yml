@@ -1,0 +1,20 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: payment-service
+  config:
+    import: optional:configserver:http://localhost:8888
+  profiles:
+    include: common,datasource
+  datasource:
+    url: jdbc:sqlserver://${DB_HOST:localhost}:${DB_PORT:1433};databaseName=food_delivery_payment_db;encrypt=false;trustServerCertificate=true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9099}
+
+app:
+  payment:
+    fraud-detection:
+      max-failed-attempts: ${PAYMENT_MAX_FAILED_ATTEMPTS:3}
+      failure-window-minutes: ${PAYMENT_FAILURE_WINDOW:30}
