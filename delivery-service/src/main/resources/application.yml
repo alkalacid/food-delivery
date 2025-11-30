@@ -1,0 +1,18 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: delivery-service
+  config:
+    import: optional:configserver:http://localhost:8888
+  profiles:
+    include: common,datasource
+  datasource:
+    url: jdbc:sqlserver://${DB_HOST:localhost}:${DB_PORT:1433};databaseName=food_delivery_delivery_db;encrypt=false;trustServerCertificate=true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9099}
+    consumer:
+      group-id: delivery-service-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false

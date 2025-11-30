@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="1" author="dberezina">
+        <comment>Create couriers table</comment>
+        <createTable tableName="couriers">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="vehicle_type" type="VARCHAR(50)"/>
+            <column name="vehicle_number" type="VARCHAR(50)"/>
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="current_latitude" type="DECIMAL(10,8)"/>
+            <column name="current_longitude" type="DECIMAL(11,8)"/>
+            <column name="last_location_update" type="DATETIME2"/>
+            <column name="average_rating" type="DECIMAL(3,2)" defaultValueNumeric="0.0"/>
+            <column name="total_deliveries" type="INT" defaultValueNumeric="0"/>
+            <column name="created_at" type="DATETIME2" defaultValueComputed="GETDATE()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="DATETIME2"/>
+            <column name="deleted_at" type="DATETIME2"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="dberezina">
+        <comment>Create indexes for couriers table</comment>
+        <createIndex indexName="idx_couriers_status" tableName="couriers">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex indexName="idx_couriers_user_id" tableName="couriers">
+            <column name="user_id"/>
+        </createIndex>
+
+        <!-- NOTE: deleted_at index added in optimization changeset -->
+    </changeSet>
+
+    <changeSet id="3" author="dberezina">
+        <comment>Create deliveries table</comment>
+        <createTable tableName="deliveries">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="order_id" type="BIGINT">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="courier_id" type="BIGINT"/>
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="pickup_latitude" type="DECIMAL(10,8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="pickup_longitude" type="DECIMAL(11,8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="delivery_latitude" type="DECIMAL(10,8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="delivery_longitude" type="DECIMAL(11,8)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="estimated_distance_meters" type="INT"/>
+            <column name="estimated_time_minutes" type="INT"/>
+            <column name="assigned_at" type="DATETIME2"/>
+            <column name="picked_up_at" type="DATETIME2"/>
+            <column name="delivered_at" type="DATETIME2"/>
+            <column name="notes" type="VARCHAR(500)"/>
+            <column name="rating" type="INT"/>
+            <column name="feedback" type="VARCHAR(500)"/>
+            <column name="created_at" type="DATETIME2" defaultValueComputed="GETDATE()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="DATETIME2"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="4" author="dberezina">
+        <comment>Create foreign key and indexes for deliveries table</comment>
+        <addForeignKeyConstraint
+            baseTableName="deliveries"
+            baseColumnNames="courier_id"
+            constraintName="fk_deliveries_courier"
+            referencedTableName="couriers"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+
+        <createIndex indexName="idx_deliveries_order_id" tableName="deliveries">
+            <column name="order_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_deliveries_courier_id" tableName="deliveries">
+            <column name="courier_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_deliveries_status" tableName="deliveries">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex indexName="idx_deliveries_created_at" tableName="deliveries">
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ========================================
+         INDEX OPTIMIZATIONS
+         ======================================== -->
+
+    <changeSet id="5" author="dberezina">
+        <comment>Add composite indexes for courier and delivery optimization</comment>
+        
+        <!-- Query: WHERE deleted_at IS NULL (in almost all courier queries) -->
+        <!-- CRITICAL: This index was missing, causing full table scans -->
+        <createIndex indexName="idx_couriers_deleted_at" tableName="couriers">
+            <column name="deleted_at"/>
+        </createIndex>
+        
+        <!-- Query: WHERE courier_id = ? AND status IN (?, ?) -->
+        <!-- Find active deliveries for courier -->
+        <createIndex indexName="idx_deliveries_courier_status" tableName="deliveries">
+            <column name="courier_id"/>
+            <column name="status"/>
+        </createIndex>
+        
+        <!-- Query: WHERE deleted_at IS NULL AND status = 'AVAILABLE' -->
+        <!-- CRITICAL for courier assignment algorithm -->
+        <createIndex indexName="idx_couriers_deleted_status" tableName="couriers">
+            <column name="deleted_at"/>
+            <column name="status"/>
+        </createIndex>
+        
+        <rollback>
+            <dropIndex tableName="couriers" indexName="idx_couriers_deleted_at"/>
+            <dropIndex tableName="deliveries" indexName="idx_deliveries_courier_status"/>
+            <dropIndex tableName="couriers" indexName="idx_couriers_deleted_status"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ========================================
+         DATA INTEGRITY: CHECK CONSTRAINTS
+         ======================================== -->
+
+    <changeSet id="6" author="dberezina">
+        <comment>Add CHECK constraints for data integrity</comment>
+        
+        <!-- Delivery rating must be between 1 and 5 (or NULL) -->
+        <sql>
+            ALTER TABLE deliveries ADD CONSTRAINT chk_deliveries_rating 
+                CHECK (rating IS NULL OR (rating >= 1 AND rating <= 5));
+        </sql>
+        
+        <!-- Courier rating must be between 0 and 5 -->
+        <sql>
+            ALTER TABLE couriers ADD CONSTRAINT chk_couriers_rating 
+                CHECK (average_rating >= 0 AND average_rating <= 5);
+        </sql>
+        
+        <!-- Courier coordinates must be valid (if provided) -->
+        <sql>
+            ALTER TABLE couriers ADD CONSTRAINT chk_couriers_latitude 
+                CHECK (current_latitude IS NULL OR (current_latitude >= -90 AND current_latitude <= 90));
+        </sql>
+        
+        <sql>
+            ALTER TABLE couriers ADD CONSTRAINT chk_couriers_longitude 
+                CHECK (current_longitude IS NULL OR (current_longitude >= -180 AND current_longitude <= 180));
+        </sql>
+        
+        <!-- Delivery coordinates must be valid -->
+        <sql>
+            ALTER TABLE deliveries ADD CONSTRAINT chk_deliveries_pickup_latitude 
+                CHECK (pickup_latitude >= -90 AND pickup_latitude <= 90);
+        </sql>
+        
+        <sql>
+            ALTER TABLE deliveries ADD CONSTRAINT chk_deliveries_pickup_longitude 
+                CHECK (pickup_longitude >= -180 AND pickup_longitude <= 180);
+        </sql>
+        
+        <sql>
+            ALTER TABLE deliveries ADD CONSTRAINT chk_deliveries_delivery_latitude 
+                CHECK (delivery_latitude >= -90 AND delivery_latitude <= 90);
+        </sql>
+        
+        <sql>
+            ALTER TABLE deliveries ADD CONSTRAINT chk_deliveries_delivery_longitude 
+                CHECK (delivery_longitude >= -180 AND delivery_longitude <= 180);
+        </sql>
+        
+        <!-- Distance and time must be positive -->
+        <sql>
+            ALTER TABLE deliveries ADD CONSTRAINT chk_deliveries_distance 
+                CHECK (estimated_distance_meters IS NULL OR estimated_distance_meters > 0);
+        </sql>
+        
+        <sql>
+            ALTER TABLE deliveries ADD CONSTRAINT chk_deliveries_time 
+                CHECK (estimated_time_minutes IS NULL OR estimated_time_minutes > 0);
+        </sql>
+        
+        <rollback>
+            <sql>ALTER TABLE deliveries DROP CONSTRAINT chk_deliveries_rating;</sql>
+            <sql>ALTER TABLE couriers DROP CONSTRAINT chk_couriers_rating;</sql>
+            <sql>ALTER TABLE couriers DROP CONSTRAINT chk_couriers_latitude;</sql>
+            <sql>ALTER TABLE couriers DROP CONSTRAINT chk_couriers_longitude;</sql>
+            <sql>ALTER TABLE deliveries DROP CONSTRAINT chk_deliveries_pickup_latitude;</sql>
+            <sql>ALTER TABLE deliveries DROP CONSTRAINT chk_deliveries_pickup_longitude;</sql>
+            <sql>ALTER TABLE deliveries DROP CONSTRAINT chk_deliveries_delivery_latitude;</sql>
+            <sql>ALTER TABLE deliveries DROP CONSTRAINT chk_deliveries_delivery_longitude;</sql>
+            <sql>ALTER TABLE deliveries DROP CONSTRAINT chk_deliveries_distance;</sql>
+            <sql>ALTER TABLE deliveries DROP CONSTRAINT chk_deliveries_time;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
