@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="1" author="dberezina">
+        <comment>Create notifications table</comment>
+        <createTable tableName="notifications">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="type" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="channel" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="subject" type="VARCHAR(200)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="content" type="VARCHAR(2000)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="recipient_email" type="VARCHAR(255)"/>
+            <column name="recipient_phone" type="VARCHAR(20)"/>
+            <column name="error_message" type="VARCHAR(500)"/>
+            <column name="retry_count" type="INT" defaultValueNumeric="0"/>
+            <column name="sent_at" type="DATETIME2"/>
+            <column name="created_at" type="DATETIME2" defaultValueComputed="GETDATE()">
+                <constraints nullable="false"/>
+            </column>
+            <column name="updated_at" type="DATETIME2"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="dberezina">
+        <comment>Create indexes for notifications table</comment>
+        <createIndex indexName="idx_notifications_user_id" tableName="notifications">
+            <column name="user_id"/>
+        </createIndex>
+
+        <createIndex indexName="idx_notifications_type" tableName="notifications">
+            <column name="type"/>
+        </createIndex>
+
+        <createIndex indexName="idx_notifications_status" tableName="notifications">
+            <column name="status"/>
+        </createIndex>
+
+        <createIndex indexName="idx_notifications_created_at" tableName="notifications">
+            <column name="created_at"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- ========================================
+         INDEX OPTIMIZATIONS
+         ======================================== -->
+
+    <changeSet id="3" author="dberezina">
+        <comment>Add composite indexes for notifications optimization</comment>
+        
+        <!-- Query: WHERE status = 'FAILED' AND retry_count < ? AND created_at > ? -->
+        <!-- CRITICAL for retry mechanism -->
+        <createIndex indexName="idx_notifications_retry" tableName="notifications">
+            <column name="status"/>
+            <column name="retry_count"/>
+            <column name="created_at"/>
+        </createIndex>
+        
+        <!-- Query: WHERE user_id = ? ORDER BY created_at DESC -->
+        <!-- User notification history -->
+        <createIndex indexName="idx_notifications_user_created" tableName="notifications">
+            <column name="user_id"/>
+            <column name="created_at" descending="true"/>
+        </createIndex>
+        
+        <rollback>
+            <dropIndex tableName="notifications" indexName="idx_notifications_retry"/>
+            <dropIndex tableName="notifications" indexName="idx_notifications_user_created"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
